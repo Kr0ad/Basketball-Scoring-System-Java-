@@ -4,7 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.Arrays;
 import java.util.concurrent.*;
-//putanginamo
+
 public class BasketballScoreServer extends Frame {
 
     // ── Constants ─────────────────────────────────────────────
@@ -267,25 +267,55 @@ public class BasketballScoreServer extends Frame {
         }
     }
 
-    /** Apply the highest pending score and close the window. */
+    /**
+     * Majority-rules resolution.
+     * Count votes for each score value (2 or 3).
+     * Whichever value has the most votes wins.
+     * Tie (1-1-1 all different, or 1-1 split) → higher value wins as tiebreaker.
+     */
     private void resolveScore() {
         synchronized (scoreLock) {
             if (!windowOpen) return;
             windowOpen = false;
 
-            int highest = 0;
+            // Build submission log string
             StringBuilder submissions = new StringBuilder();
             for (int i = 0; i < NUM_SCORERS; i++) {
-                highest = Math.max(highest, pendingScores[i]);
                 submissions.append("S").append(i + 1).append("=")
                            .append(pendingScores[i] == 0 ? "-" : pendingScores[i]);
                 if (i < NUM_SCORERS - 1) submissions.append(" ");
             }
 
-            if (highest > 0) {
-                gameState.score[gameState.activeTeam] += highest;
-                log("✅ Resolved [" + submissions + "] → +" + highest +
-                    " pts  |  Team " + (gameState.activeTeam == 0 ? "A" : "B") +
+            // Count votes per value
+            int votes2 = 0, votes3 = 0;
+            for (int s : pendingScores) {
+                if (s == 2) votes2++;
+                else if (s == 3) votes3++;
+            }
+
+            int result;
+            String reason;
+            if (votes2 == 0 && votes3 == 0) {
+                // Nobody submitted anything
+                log("ℹ️  Score window closed with no submissions.");
+                return;
+            } else if (votes2 > votes3) {
+                result = 2;
+                reason = votes2 + " scorer(s) voted 2 — majority wins";
+            } else if (votes3 > votes2) {
+                result = 3;
+                reason = votes3 + " scorer(s) voted 3 — majority wins";
+            } else {
+                // Tie (e.g. 1 vote each) → higher value wins as tiebreaker
+                result = 3;
+                reason = "tie (" + votes2 + " vs " + votes3 + ") → 3 wins as tiebreaker";
+            }
+
+            if (result > 0) {
+                gameState.score[gameState.activeTeam] += result;
+                log("✅ Resolved [" + submissions + "] → +" + result +
+                    " pts  (" + reason + ")" +
+                    "  |  Team " + (gameState.activeTeam == 0 ? "A" : "B") +
                     " total: " + gameState.score[gameState.activeTeam]);
                 broadcastAndRefresh();
             } else {
