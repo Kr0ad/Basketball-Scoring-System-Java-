@@ -10,8 +10,6 @@ public class GameState {
     public boolean gameOver   = false;
 
     // ─── Protocol string broadcast to all clients ───────────────
-    // Format:  STATE|scoreA|scoreB|foulsA|foulsB|toA|toB|quarter|active|status
-    // Example: STATE|12|8|3|1|2|3|2|A|LIVE
     public synchronized String toProtocolString() {
         return String.format("STATE|%d|%d|%d|%d|%d|%d|%d|%s|%s",
             score[0], score[1],
